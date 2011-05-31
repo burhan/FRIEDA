@@ -1,0 +1,194 @@
+FRIEDA
+
+=================
+ WHAT Is Frieda?
+==================
+
+FRIEDA takes images saved to a file server, generates a powerpoint with 
+those images, and emails a link to a web server where the user to 
+download their powerpoint from.
+
+========================
+ Example
+========================
+
+FRIEDA was designed for Radiologists at Weill Cornell Medical College on 
+our local intranet to save deidentified images off of the PACS system.  
+Due to risks of USB thumbdrives containing viruses, it had become 
+cumbersome for radiologists to save images and put them in powerpoints 
+for their teaching activities.  FRIEDA was designed to make this process 
+easier.  Radiologists on the PACS would save images onto a shared 
+network drive (e.g., a SAMBA drive running on our linux server that can 
+be connected to the PACS) under a folder with their email address.
+
+Every 5 (default) minutes a cron script executes running 
+frieda_file_check.py, which checks for new files on the SAMBA drive.  If 
+those files haven't been modified in the past (default) 5 minutes (a 
+wait period to allow time for the user to finish saving all their 
+images), the files are moved off of the network file server for file 
+processing.
+
+The images would be processed for inclusion in powerpoint.  E.g., DICOM 
+images are deidentified and converted into PNGs, 16-bit TIFFs are 
+converted (that powerpoint can't render) into 8-bit TIFFs (that 
+powerpoint can handle).  Ideally the saved images from the PACS are 
+already de-identified, which should be the default when images are 
+exported from a PACS.
+
+An open office presentation document is created using the open document 
+format that creates a slide per image.
+
+This open office document format is then converted into a powerpoint 
+file using frieda_unoconv.py.
+
+An announcement email is then sent out with a link to download the 
+powerpoint.  The directory to download the files typically looks 
+something like:
+
+http://YourWebServer.org/FRIEDA/b9969a51b82cad88573b/username/username_Feb_01_2011_0100pm.ppt
+
+The URL contains an N (by default 20) character hash 
+(b9969a51b82cad88573b) that is generated that has a very high 
+probability of being unique for each user.  The large number of possible 
+hashes (16^N or ~1e24 for a 20 character hash) make it very unlikely 
+that User A could guess or brute-force the hash of User B and see what 
+files they are saving, unless User A gave told user B their hash.  This 
+gives a modicum of privacy without requiring users to login with a 
+password.
+
+FRIEDA does not contain the network file server (e.g., SAMBA) or 
+webserver (e.g., Apache), which must be setup separately.  Installation 
+instructions for both are given for a new ubuntu 10.04 (LTS) 
+installation starting from scratch.
+
+========================
+  Dependencies
+========================
+
+Python - version 2.3, 2.4, 2.5, 2.6, or 2.7
+	http://www.python.org
+
+
+OpenOffice with a python-uno bridge - Python UNO bridge to connect to OpenOffice
+	Used to convert OpenDocument Presentation into PowerPoint.
+
+
+ODFPY - Creation of an Open Document Presentation with Python.
+	http://odfpy.forge.osor.eu/
+	http://pypi.python.org/pypi/odfpy/
+	http://opendocumentfellowship.com/projects/odfpy
+
+	or installed with
+		sudo easy_install odfpy
+	if you have the python-setuptools installed:
+              (sudo apt-get install python-setuptools).
+
+Python Imaging Library (PIL) - Recognize image file formats.
+	Can be installed with
+	sudo apt-get install python-imaging
+
+PythonMagick (Optional) - Convert 16-bit TIFFs to 8-bit TIFFs
+
+
+Samba server (Optional)
+
+Apache server (Optional)
+
+SMTP Server (Optional)
+
+=================
+Suggested Installation instructions on a linux box.
+=================
+
+Commands are for ubuntu 10.04, though should be easily adjusted for similar debian based linux distributions.  (Though
+package names may have slightly changed).
+
+In the terminal type:
+
+  sudo apt-get install python-uno python-imaging python-setuptools python-pythonmagick
+
+to install the python packages from the ubuntu repository (will also install several dependencies).
+
+  sudo easy_install odfpy
+
+=======
+Install optional samba server (Windows file share for users to drop images from):
+=======
+  sudo apt-get install samba smbfs
+
+Edit /etc/samba/smb.conf (from terminal type in: sudo gedit /etc/samba/smb.conf )
+and configure to your specifications.
+My setup enables user security; gives write permissions to all users, changes the creation and directory
+mask to 0775: (change the relevant lines to be):
+
+security = user
+username map = /etc/samba/smbusers
+read only = no
+create mask=0775
+directory mask=0775
+valid users = %S
+
+Then set up your smbusers.  First, create a the linux accounts of the users (e.g., samba_user) on your linux system:
+
+   sudo adduser samba_user
+
+Then create a samba password with
+
+   sudo smbpasswd samba_user
+
+Then create a file /etc/samba/smbusers and add your users with a line like:
+
+   samba_user="samba_user"
+
+The left side is the user name on the linux system; the right hand side is samba users (could be a list of users) that
+ are tied to that linux account.
+
+Now you should be able to map the drive in windows using the format \\yourmachinename\samba_user with samba_user.
+
+You may wish to limit permissions on the samba_user
+
+=======
+Install web server
+=======
+E.g., apache to serve web documents.
+
+http://www.apache.org/
+
+If you want a simple django site to display user statistics.
+
+=======
+Install Mail Server
+=======
+E.g., sendmail / postfix
+Originally I connected to the medical colleges mail server, but found that occasionally emails would fail to send on
+time outs and not be queued later using pythons SMTP library (smtplib).  Instead I run postfix on the same server to relay
+messages to the SMTP server.
+
+The command for sending out mail, used by default is the shell command 'mail'.
+
+http://www.postfix.org/
+
+Alternatively you can use an smtp mailserver, by setting SMTP_MAILSERVER,
+and changing the settings accordingly.  If authentication or other 
+customization is necessary on the SMTP server slight modification to 
+freida_sendmail.py may need to be done.
+
+======
+Configure FRIEDA
+======
+
+Go through these settings in frieda_settings.py and configure to your needs.
+
+
+=====
+Set up cron job
+=====
+
+Add a line to a users cron who has permission to move files off of 
+samba_user and has permissions to move them to the WEB_ROOT_DIR (set in settings).
+
+E.g., type
+
+sudo crontab -u webdata 
+
+0,5,10,15,20,25,30,35,40,45,50,55 * * * *   /usr/local/bin/tfs_check.py
