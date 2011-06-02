@@ -62,6 +62,13 @@ instructions for both are given for a new ubuntu 10.04 (LTS)
 installation starting from scratch.
 
 ========================
+ Quick installation instruction on Ubuntu 10.04 
+========================
+Run the following command from the terminal
+>>> sudo bash quick_install.sh
+
+
+========================
   Dependencies
 ========================
 
@@ -86,6 +93,12 @@ ODFPY - Creation of an Open Document Presentation with Python.
 Python Imaging Library (PIL) - Recognize image file formats.
 	Can be installed with
 	sudo apt-get install python-imaging
+
+dcmtk - DICOM Toolkit:
+        Used to deidentify dicom images and convert to PNG.
+        Can be installed with
+        sudo apt-get install dcmtk
+
 
 PythonMagick (Optional) - Convert 16-bit TIFFs to 8-bit TIFFs
 
@@ -150,28 +163,35 @@ You may wish to limit permissions on the samba_user
 =======
 Install web server
 =======
-E.g., apache to serve web documents.
+E.g., apache/nginx to serve web documents.
 
-http://www.apache.org/
+http://www.apache.org/ or http://nginx.org
+ 
+On ubuntu 10.04 this can be installed with the following command:
 
-If you want a simple django site to display user statistics.
+sudo apt-get install nginx
+
+You may also want to install a firewall on the webserver (e.g., ufw) to restrict IP addresses 
+allowed to access the web server to within the intranet.
 
 =======
 Install Mail Server
 =======
-E.g., sendmail / postfix
-Originally I connected to the medical colleges mail server, but found that occasionally emails would fail to send on
-time outs and not be queued later using pythons SMTP library (smtplib).  Instead I run postfix on the same server to relay
-messages to the SMTP server.
+Personally, I found using the medical college's internal mailserver with 
+using postfix as a mail server to be the most reliable method, where 
+mail is generated from the command line with the command 'mail'  
+
+However setting up that sort of setup is difficult and is likely dependent 
+on your local settings.
+
+So by default, I use gmail.com as an smtp mail server accessed through python's
+SMTP library (smtplib).
 
 The command for sending out mail, used by default is the shell command 'mail'.
 
 http://www.postfix.org/
 
-Alternatively you can use an smtp mailserver, by setting SMTP_MAILSERVER,
-and changing the settings accordingly.  If authentication or other 
-customization is necessary on the SMTP server slight modification to 
-freida_sendmail.py may need to be done.
+The guides for setting up your mailserver will be highly dependent on your local setup.
 
 ======
 Configure FRIEDA
@@ -189,6 +209,14 @@ samba_user and has permissions to move them to the WEB_ROOT_DIR (set in settings
 
 E.g., type
 
-sudo crontab -u webdata 
+sudo crontab -u webdata -e
 
-0,5,10,15,20,25,30,35,40,45,50,55 * * * *   /usr/local/bin/tfs_check.py
+0,5,10,15,20,25,30,35,40,45,50,55 * * * *   /path/to/frieda_file_check.py
+
+=====
+Troubleshooting
+=====
+1). unoconv gives you errors about not being able to start X.
+run 'xhost +' as the user logged into X.
+
+

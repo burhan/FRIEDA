@@ -1,10 +1,12 @@
 #!/usr/bin/python
 
+import os
+
 ## FRIEDA - File Server Settings
 
 
 ## NETWORK_FILESERVER_ROOT is the location where files are saved
-NETWORK_FILESERVER_ROOT = '/home/samba_user'
+NETWORK_FILESERVER_ROOT = '/home/samba_user/'
 
 ## SKIPPED DIRS is a python list of directories to skip processing Directories from the NETWORK_FILESERVER_ROOT
 ## E.g., if you had sub-directory of NETWORK_FILESERVER_ROOT say: 'dir_to_skip/' you would want to use
@@ -14,7 +16,7 @@ SKIPPED_DIRS = []
 ## This is the root of location of files on the webserver.  (Where FRIEDA moves the files after processing).
 WEB_ROOT_DIR = '/home/webdata/data/'
 ## This is the corresponding root location of the files on the webserver.
-WEB_ROOT_URL = 'http://radteaching.med.cornell.edu/FRIEDA/'
+WEB_ROOT_URL = 'http://localhost/data/'
 
 ## On the webserver the subdirectories where ZIP_DIR, TMP_DIR, and ODP_DIR
 ## where the temporary files, zip files, and odp files are stored.
@@ -30,14 +32,14 @@ ODP_DIR = 'odp'
 
 LOG_LOCATION = '/var/log/tfs'
 LOG_FILE = 'frieda.log'
-LOG_LEVEL = 20 # INFO
-
+LOG_LEVEL = 10 # DEBUG
+LOG_FILENAME = os.path.join(LOG_LOCATION, LOG_FILE)
 # SHLF_FILE Stores statistics
-SHLF_FILE = 'tfs_stats.shlf'
+SHLF_FILE = 'frieda_stats.shlf'
 
 ## Some arbitrary string used as a SALT for the MD5 of the email address
 ## It is strongly suggested that you alter this string deploying.
-HASHSALT = '1a2s3d4f5g6h7j8k9l0;'
+HASHSALT = '1a2stjsr374i2tj32h7j8k9l0;'
 #
 HASHLENGTH = 20
 
@@ -65,9 +67,21 @@ EMAIL_BODY = ("""
 ## {linked_file_url}, {email},{linked_file_name} are fields.
 FILE_LINKS_FORMAT = "<p><a href='{linked_file_url}'>{linked_file_url}</a></p>"
 
-USE_ALTERNATE_SMTP_MAIL_SERVER = False
+#USE_ALTERNATE_SMTP_MAIL_SERVER = False
 ## Uncomment the following lines if you use the alternate server and set to your smtp servers settings
 
-# USE_ALTERNATE_SMTP_MAIL_SERVER = True
-# ALTERNATE_SMTP_SERVER = 'smtp.med.cornell.org'
-# ALTERNATE_SMTP_PORT = 25
+USE_ALTERNATE_SMTP_MAIL_SERVER = True
+ALTERNATE_SMTP_SERVER = 'smtp.gmail.com'
+ALTERNATE_SMTP_PORT = 587
+LOGIN_REQUIRED = True
+TLS_REQUIRED = True
+LOGIN_NAME = 'FRIEDAradteaching@gmail.com'
+LOGIN_PASSWORD = 'TFSfreedom'# Some GMAIL PASSWORD
+
+if __name__ == '__main__':
+    # Try creating directories
+    from frieda_file_check import run_command
+    for location in (NETWORK_FILESERVER_ROOT, WEB_ROOT_DIR, LOG_LOCATION):
+        run_command('sudo mkdir -p %s' % location)
+    run_command('sudo chgrp www-data %s' % LOG_LOCATION)
+    run_command('sudo chmod 02775 %s' % LOG_LOCATION)

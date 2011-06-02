@@ -6,19 +6,23 @@ import smtplib
 import logging
 import time
 import commands
+import os
 
-from django.core.validators import email_re
 
 if __name__ == '__main__':
-    LOG_FILENAME = '/var/log/tfs/email.log'
-    logging.basicConfig(filename=LOG_FILENAME, level=logging.DEBUG,
+    LOG_FILENAME = os.path.join(settings.LOG_LOCATION, settings.LOG_FILE)
+    logging.basicConfig(filename=LOG_FILENAME, level=setttings.LOG_LEVEL,
                         format="%(asctime)s %(levelname)s: %(message)s")
     raiseExceptions = False
 
 
 def is_valid_email(email_str):
-    return email_re.match(email_str)
-
+    try:
+        from django.core.validators import email_re
+        return email_re.match(email_str)
+    except ImportError:
+        logging.warning("Django not installed; email validation not performed")
+        return True
 
 class SMTPEmail(object):
     def __init__(self, recipients=None, subject="",
@@ -101,6 +105,8 @@ class EmailSet(object):
     def add_smtp_email(self, email):
         if type(email)==SMTPEmail:
             self.email_set.append(email)
+        else:
+            raise TypeError("Email to append to EmailSet not a SMTPEmail")
 
     def send_emails(self):
         if len(self.email_set) == 0:
@@ -119,105 +125,75 @@ class EmailSet(object):
                     logging.info("Sent email to %r" % email.recipients)
                 else:
                     logging.error("Didn't send? %r" % statusoutput)
+                
+
+    def alt_initialize_server(self):
+        try:
+            logging.debug("Connecting to server")
+            self.server = smtplib.SMTP(settings.ALTERNATE_SMTP_SERVER, settings.ALTERNATE_SMTP_PORT)
+            
+            logging.debug("Connected to server")
+            self.server.set_debuglevel(self.verbose)
+            if hasattr(settings, 'TLS_REQUIRED') and settings.TLS_REQUIRED:
+                self.server.starttls()
+            self.server.ehlo()
+            if hasattr(settings, 'LOGIN_NAME') and hasattr(settings, 'LOGIN_PASSWORD'):
+                self.server.login(settings.LOGIN_NAME, settings.LOGIN_PASSWORD)
+        except Exception as inst:
+            logging.error("Initialization failed: %r" % inst)
+
+    def alt_send_one_email(self, email):
+        try:
+            logging.debug("Sending email to %r" % email.recipients)
+            response_dict = self.server.sendmail(email.fromaddr, email.recipients, email.msg_str())
+            logging.info("Sent email to %r" % email.recipients)
+            if self.verbose:
+                email.print_email()
+            return True
+        except:
+            logging.error("Email sending failed")
+            return False
+
+    def alt_reset_server(self):
+        try:
+            self.server.rset()
+            self.server.quit()
+        except:
+            logging.error("Resetting and quitting server Failed")
+        finally:
+            self.alt_initialize_server()
 
     def alt_send_emails(self):
         if len(self.email_set) == 0:
             logging.debug("No emails to send")
             return True
-        else:
-            logging.debug("Connecting to server")
-            try:
-                server = smtplib.SMTP(settings.ALTERNATE_SMTP_SERVER, settings.ALTERNATE_SMTP_PORT)
-                logging.debug("Connected to server")
-                server.set_debuglevel(self.verbose)
-                server.ehlo()
-                for email in self.email_set:
-                    try:
-                        logging.debug("Sending email to %r" % email.recipients)
-                        response_dict = server.sendmail(email.fromaddr, email.recipients, email.msg_str())
-                        try:
-                            logging.debug('%r' % response_dict)
-                        except:
-                            pass
-                        logging.info("Sent email to %r" % email.recipients)
-                        if self.verbose:
-                            email.print_email()
-                    except Exception as inst:
-                        try:
-                            logging.error('RD: %r' % response_dict)
-                        except:
-                            pass
-                        logging.error("Email Sending Failed")
-                        logging.error("From: %s, Recipients: %r" % (email.fromaddr, email.recipients))
-                        logging.error("%s" % email.msg_str() )
-                        logging.error("%r" % ( type(inst) ) )
-                        try:
-                            logging.error("%s" % inst)
-                        except:
-                            pass
-                        try:
-                            logging.info("Second Attempt to send to %r" % email.recipients)
-                            try:
-                                server.rset()
-                            except:
-                                pass
-                            try:
-                                server.quit()
-                            except:
-                                pass
-                            time.sleep(15)
-                            server2 = smtplib.SMTP(settings.ALTERNATE_SMTP_SERVER, settings.ALTERNATE_SMTP_PORT)
-                            server2.set_debuglevel(self.verbose)
-                            server2.ehlo()
-                            logging.info("Sending ... to %r" % email.recipients)
-                            response_dict = server2.sendmail(email.fromaddr, email.recipients, email.msg_str())
-                            logging.info("Sent email to %r (2nd Attempt)" % email.recipients)
-                        except Exception as inst:
-                            try:
-                                logging.error('RD: %r' % response_dict)
-                            except:
-                                pass
-                            logging.error("Second Attempt Email Sending Failed")
+        try:
+            self.alt_initialize_server()
+            for email in self.email_set:
+                sent = self.alt_send_one_email(email)
+                if not sent:
+                    time.sleep(15)
+                    self.alt_reset_server()
+                    time.sleep(15)
+                    logging.debug("Second Attempt")
+                    sent = self.alt_send_one_email(email)
+                    if not sent:
+                        time.sleep(15)
+                        self.alt_reset_server()
+                        time.sleep(15)
+                        logging.debug("Third Attempt")
+                        sent = self.alt_send_one_email(email)
+                        if not sent:
+                            logging.error("Email Sending Failed on Three Attempts")
                             logging.error("From: %s, Recipients: %r" % (email.fromaddr, email.recipients))
                             logging.error("%s" % email.msg_str() )
                             logging.error("%r" % ( type(inst) ) )
-                            try:
-                                logging.error("%s" % inst)
-                            except:
-                                pass
-                            try:
-                                logging.info("Third Attempt to send to %r" % email.recipients)
-                                try:
-                                    server2.rset()
-                                    server2.quit()
-                                except:
-                                    pass
-                                time.sleep(75)
-                                server3 = smtplib.SMTP(settings.ALTERNATE_SMTP_SERVER, settings.ALTERNATE_SMTP_PORT)
-                                server3.set_debuglevel(self.verbose)
-                                server3.ehlo()
-                                logging.info("Sending ... to %r" % email.recipients)
-                                response_dict = server.sendmail(email.fromaddr, email.recipients, email.msg_str())
-                                logging.info("Sent email to %r (3rd Attempt)" % email.recipients)
-                            except Exception as inst:
-                                try:
-                                    logging.error('RD: %r' % response_dict)
-                                except:
-                                    pass
-                                logging.error("Email Sending Failed")
-                                logging.error("From: %s, Recipients: %r" % (email.fromaddr, email.recipients))
-                                logging.error("%s" % email.msg_str() )
-                                logging.error("%r" % ( type(inst) ) )
-                                try:
-                                    logging.error("%s" % inst)
-                                except:
-                                    pass
 
-            except:
-                logging.debug("Can't connect to server")
-            finally:
-                logging.debug("Reseting and Quitting Server")
-                server.rset()
-                server.quit()
-                logging.debug("Successfully Quit Server")
-            return True
+        except Exception as inst:
+            logging.error("%r" % inst)
+        finally:
+            logging.debug("Reseting and Quitting Server")
+            self.server.rset()
+            self.server.quit()
+            logging.debug("Successfully Quit Server")
+        return True

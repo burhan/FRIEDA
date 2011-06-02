@@ -52,9 +52,8 @@ except ImportError:
 from frieda_sendmail import EmailSet, SMTPEmail
 
 def get_hash(emailaddr):
-    '''Don't modify this function/salt, or all directories should change
-    >>> get_md5('jal2018') == 'fe876e4fda'
-    True
+    '''
+    This hash takes the email address and global secret salt.
     '''
     return hashlib.sha512(emailaddr.upper()+settings.HASHSALT).hexdigest()[0:settings.HASHLENGTH]
 
@@ -122,6 +121,12 @@ def gen_announcement_email(full_email, linked_files, num_images=0, ppt_content=N
     slide_contents_list.append("</ul>")
     slide_contents = ''.join(slide_contents_list)
     file_link_list = []
+    amp_loc = full_email.find('@')
+    if amp_loc > 0:
+        emailaddr = full_email[:amp_loc]
+    else:
+        emailaddr = full_email
+
     for lf in linked_files:
         file_link_list.append(
                 settings.FILE_LINKS_FORMAT.format(linked_file_url=get_media_path(emailaddr,lf),
@@ -130,14 +135,13 @@ def gen_announcement_email(full_email, linked_files, num_images=0, ppt_content=N
                                                   ))
     file_links = ''.join(file_link_list)
 
-    emailaddr = full_email
     fromaddr = settings.DEFAULT_FROMADDR
 
     email = SMTPEmail(fromaddr = fromaddr)
     email.add_recipients([full_email,])
     email.set_subject(settings.EMAIL_SUBJECT.format(num_images=num_images, email=emailaddr))
-    browse_files_link
-    email.set_body(settings.BODY.format(file_links=file_links, slide_contents=slide_contents,
+#    browse_files_link
+    email.set_body(settings.EMAIL_BODY.format(file_links=file_links, slide_contents=slide_contents,
                                         email=emailaddr, num_images=num_images,
                                         browse_files_url=get_media_path(emailaddr)))
     if num_images > 0:
@@ -187,7 +191,7 @@ def process_user_image_files(emailaddr):
     pagewidth = 800
     pageheight = 600
     logging.debug("cur_path %s" % (os.path.realpath('.'),) )
-    odpfile = 'tfs_%s_%s.odp' % (emailaddr, time.strftime('%b_%d_%Y_%I%M%P'))
+    odpfile = 'frieda_%s_%s.odp' % (emailaddr, time.strftime('%b_%d_%Y_%I%M%P'))
     ppt_content = []
 
     file_list = []
@@ -344,7 +348,7 @@ def check_dir_new_file(full_email, email_set, stat_shelf, samba_dir):
         logging.error("Statistics Failed")
 
     if tmp_odp:
-        success = run_command(""" frieda_unoconv -f ppt %r """ % str(os.path.join(t_root,tmp_odp)))
+        success = run_command(""" unoconv -f ppt %r """ % str(os.path.join(t_root,tmp_odp)))
         tmp_ppt = tmp_odp[:-3] + 'ppt'
         if success:
             logging.debug('Converted %s to ppt successfully; removing odp' % tmp_odp)
@@ -396,7 +400,7 @@ def check_dirs_new_files(samba_dir=settings.NETWORK_FILESERVER_ROOT):
         logging.debug("Opening Statistic Shelf")
         stat_shelf = shelve.open(os.path.join(settings.LOG_LOCATION, settings.SHLF_FILE))
     except:
-        logging.error("Stastics shelf could not be opened.  Check file permissions.")
+        logging.error("Statistics shelf could not be opened.  Check file permissions.")
         stat_shelf = None
     try:
         for emailaddr in email_dirs:
@@ -418,6 +422,6 @@ def check_dirs_new_files(samba_dir=settings.NETWORK_FILESERVER_ROOT):
 
 
 if __name__ == '__main__':
-    logging.debug("Launching tfs_check.py %s" % time.ctime())
+    logging.debug("Launching frieda_file_check.py %s" % time.ctime())
     check_dirs_new_files(settings.NETWORK_FILESERVER_ROOT)
-    logging.debug("Ending tfs_check.py %s" % time.ctime())
+    logging.debug("Ending frieda_file_check.py %s" % time.ctime())
