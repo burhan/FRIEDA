@@ -4,6 +4,7 @@ import os
 
 ## FRIEDA - File Server Settings
 
+YOUR_HOST = localhost # Set to IP Address/Domain name of your server.
 
 ## NETWORK_FILESERVER_ROOT is the location where files are saved
 NETWORK_FILESERVER_ROOT = '/home/samba_user/'
@@ -16,7 +17,7 @@ SKIPPED_DIRS = []
 ## This is the root of location of files on the webserver.  (Where FRIEDA moves the files after processing).
 WEB_ROOT_DIR = '/home/webdata/data/'
 ## This is the corresponding root location of the files on the webserver.
-WEB_ROOT_URL = 'http://localhost/data/'
+WEB_ROOT_URL = 'http://%s/data/' % YOUR_HOST
 
 ## On the webserver the subdirectories where ZIP_DIR, TMP_DIR, and ODP_DIR
 ## where the temporary files, zip files, and odp files are stored.
@@ -75,8 +76,8 @@ ALTERNATE_SMTP_SERVER = 'smtp.gmail.com'
 ALTERNATE_SMTP_PORT = 587
 LOGIN_REQUIRED = True
 TLS_REQUIRED = True
-LOGIN_NAME = 'FRIEDAradteaching@gmail.com'
-LOGIN_PASSWORD = 'TFSfreedom'# Some GMAIL PASSWORD
+LOGIN_NAME = 'FRIEDA@gmail.com'
+LOGIN_PASSWORD = ''# Some GMAIL PASSWORD
 
 if __name__ == '__main__':
     # Try creating directories
